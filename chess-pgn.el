@@ -145,7 +145,21 @@ Optionally use the supplied STRING instead of the current buffer."
 	(chess-pgn-parse))
     (chess-pgn-parse)))
 
-(defun chess-pgn-parse ()
+(defun chess-pgn-to-game-at-point (&optional string)
+  "Get the chess game at point."
+  (if string
+      (with-temp-buffer
+        (insert string)
+        (goto-char (point-min))
+        (chess-pgn-parse))
+    (chess-pgn-parse)))
+
+(defun chess-pgn-parse (&optional preserve-point)
+  (if preserve-point
+      (save-excursion (chess-pgn-parse-impl))
+    (chess-pgn-parse-impl)))
+
+(defun chess-pgn-parse-impl ()
   (if (or (looking-at "\\[")
 	  (and (search-forward "[" nil t)
 	       (goto-char (match-beginning 0))))
