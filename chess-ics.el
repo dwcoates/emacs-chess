@@ -314,7 +314,12 @@ standard position).  In those cases, this variable should be set to nil.")
 		  (white (match-string-no-properties 2))
 		  (black (match-string-no-properties 3)))
 	      (message "Creating game %d (%s vs. %s)" game-number white black)
-	      (chess-ics-game game-number :White white :Black black)))))
+              ; chess-module-set-game* would add event handlers
+              ; to the game as if it were an engine game
+              ; We just need (chess-engine-game nil) to return the game.
+              (setq chess-engine-opponent-name (if (string= white chess-ics-handle) black white))
+              (setq chess-module-game (chess-ics-game game-number :White white :Black black))
+))))
    (cons "^<10>$" (function (lambda () (chess-ics-send "style 12\nrefresh"))))
    (cons "^Game \\([0-9]+\\): \\S-+ backs up \\([0-9]+\\).$"
 	 (function
@@ -369,19 +374,19 @@ standard position).  In those cases, this variable should be set to nil.")
    (cons "\\S-+ would like to take back \\([0-9]+\\) half move(s)."
 	 (function
 	  (lambda ()
-	    (funcall chess-engine-response-handler 'undo
+	    (funcall #'chess-engine-default-handler 'undo
 		     (string-to-number (match-string 1))))))
-   (cons "The game has been aborted on move [^.]+\\."
+   (cons "\\S-+ has aborted the game on move [^.]+\\."
 	 (function
 	  (lambda ()
 	    (let ((chess-engine-pending-offer 'abort))
-	      (funcall chess-engine-response-handler 'accept)))))
+	      (funcall #'chess-engine-default-handler 'accept)))))
    (cons "\\S-+ accepts the takeback request\\."
 	 (function
 	  (lambda ()
-	    (funcall chess-engine-response-handler 'accept))))
+	    (funcall #'chess-engine-default-handler 'accept))))
    (cons ;; resign announcement
-    "{Game \\([0-9]+\\) (\\(\\S-+\\) vs\\. \\(\\S-+\\)) \\(\\S-+\\) resigns}"
+    "{Game \\([0-9]+\\) (\\(\\S-+\\) vs\\. \\(\\S-+\\)) \\(\\S-+\\) \\(resigns\\|forfeits by disconnection\\)}"
     (function
      (lambda ()
        (let ((chess-engine-handling-event t)
@@ -391,27 +396,28 @@ standard position).  In those cases, this variable should be set to nil.")
 				   :Black (match-string 3))))
 	 (with-current-buffer (chess-game-data game 'engine)
 	   (if opponent-p
-	       (funcall chess-engine-response-handler 'resign)
+	       (funcall #'chess-engine-default-handler 'resign)
 	     (unless (chess-game-status game)
 	       (chess-game-end game :resign))))
 	 t))))
    (cons "\\(\\S-+\\) forfeits on time}"
 	 (function
 	  (lambda ()
-	    (if (string= (match-string 1) chess-engine-opponent-name)
-		(funcall chess-engine-response-handler 'flag-fell)
-	      (funcall chess-engine-response-handler 'call-flag t)))))
+            (let ((opponent-p (not (string= chess-ics-handle (match-string 1)))))
+              (if opponent-p
+                  (funcall #'chess-engine-default-handler 'flag-fell)
+                (funcall #'chess-engine-default-handler 'call-flag t))))))
    (cons "Illegal move (\\([^)]+\\))\\."
 	 (function
 	  (lambda ()
-	    (funcall chess-engine-response-handler 'illegal
+	    (funcall #'chess-engine-default-handler 'illegal
 		     (match-string 1)))))
    (cons "Challenge: \\(\\S-+\\) \\S-+ \\S-+ \\S-+ .+"
 	 (function
 	  (lambda ()
 	    (let ((opponent (match-string 1)))
 	      (if (y-or-n-p (chess-string 'want-to-play opponent))
-		  (chess-ics-send (concat "accept " opponent))
+                  (chess-ics-send (concat "accept " opponent))
 		(chess-ics-send "decline match"))))))
    ;; Buttonize URLs.
    (cons "\"?\\(\\(https?\\|ftp\\)://[^ \t\n\r\"]+\\)\"?"

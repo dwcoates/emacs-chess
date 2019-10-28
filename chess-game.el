@@ -75,12 +75,18 @@ matches."
       (if (and (eq (caar h) function)
 	       (or (null data)
 		   (eq data (cdar h))))
-	  (if last-hook
-	      (setcdr last-hook (cdr h))
-	    (setq hooks (cdr h)))
+          (if last-hook
+              (setcdr last-hook (cdr h))
+            (setq hooks (cdr h)))
 	(setq last-hook h))
       (setq h (cdr h)))
     (chess-game-set-hooks game hooks)))
+
+(defun chess-game-get-hook-data (game function)
+  "Get list of corresponding data (nil if none) from all event hooks that match FUNCTION."
+  (cl-assert game)
+  (cl-assert function)
+  (cl-remove-if 'null (mapcar (lambda (h) (if (eq (car h) function) (cdr h))) (chess-game-hooks game))))
 
 (defsubst chess-game-run-hooks (game &rest args)
   "Run the event hooks of GAME and pass ARGS."
@@ -223,7 +229,7 @@ if INDEX is nil)."
 
 (defun chess-game-ply (game &optional index)
   "Return a ply of GAME.
-If INDEX is non-nil, the last played ply is returned."
+If INDEX is nil, the last played ply is returned."
   (cl-assert game)
   (if index
       (nth index (chess-game-plies game))
@@ -337,7 +343,8 @@ progress (nil), if it is drawn, resigned, mate, etc."
 
     (if (chess-ply-keyword ply :resign)
 	(chess-game-run-hooks game 'resign)
-      (chess-game-run-hooks game 'move current-ply))))
+      (chess-game-run-hooks game 'move current-ply)
+      (chess-game-run-hooks game 'pre-move))))
 
 (defsubst chess-game-end (game keyword)
   "End GAME, by resignation, draw, etc."
