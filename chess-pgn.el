@@ -291,8 +291,7 @@ PGN text."
 ;;;###autoload
 (define-derived-mode chess-pgn-mode text-mode "PGN"
   "A mode for editing chess PGN files."
-  (setq comment-start "{"
-	comment-end "}")
+  (setq-mode-local chess-pgn-mode comment-start "{" comment-end "}")
 
   (modify-syntax-entry ?\{ "<")
   (modify-syntax-entry ?\} ">")
